@@ -1,0 +1,89 @@
+
+## Polynomial commitmemnt scheme (PCS)
+PCS is a protocol between a prover **P** and verifier **V** such that
+1. **P** first commit to a polynomial $$f(X) = \sum_{i=0}^d f_iX^i$$. The commitment is denoted as $$com_f$$
+2. **P** can then "open" the polynomial at any given point $y$, and convince **V** that $$f(u) = v$$
+
+The commitment must have "binding" property, meaning P cannot find two polynomials $f, g$ such that the commitment collides.
+
+Optional properties: hiding
+
+## KZG
+
+KZG is defined over pairing curves $$G_1, G_2, G_T$$, where $G_1, G_2$ has prime order $p$.
+Let $g_1, g_2$ be the generator of $G_1, G_2$ respectively.
+We are using the additive group notation here: the elliptic curve operation is adding: $$g_1 \bigoplus g_1 = 2 g_1$$ and not $g_1^2$.
+
+### Setup
+Before P can do any commitment, we first need to sample a random element $$\alpha \in F_p$$ and generate the parameters:
+$$gp = (g_1, \alpha g_1, \alpha^2 g_1, ... \alpha^d g_1, \alpha g_2)$$. These values are public and both **P** and **V** can access.
+The types of them are elliptic curve points of $G_1$ and $G_2$.
+
+An important thing is $\alpha$ then has to be discarded, and no one knows $\alpha$. This is called "trusted" setup which is an undesired property. Note that knowing $gp$ doesn't reveal $\alpha$.
+
+### commit
+For a polynomial $f(X) = \sum_0^d f_i X^i$, the commitment $com_f = f(\alpha) g_1 \in G_1$.
+Remember, no one knows $\alpha$, the way **P** computes the commitment is 
+
+$$f(\alpha) g_1 = (\sum f_i \alpha^i) g_1 = \sum f_i (\alpha^i g_1) $$
+
+1. This is really cool: without knowing $\alpha$, anyone can compute and thus commit to a polynomial with the value equal to "the evaluation of polynomial on $\alpha$" (times $g_1$ of course)
+2. From $com_f = f(\alpha) g_1$ it's obvious that KZG is linear: $com_{f+g} = com_f + com_g$
+
+### open
+
+After committed to $f$, **V** can then ask **P** to open at a random point $y$, and the goal for **P** is to prove that $f(u) = v$.
+This is equivalent to saying $f(X) - v$ has root $u$, or $X - u | f(X) - v$. And thus $q(X) = \frac{f(X) - v}{X - u}$ is a polynomial.
+The "proof" is then the commitment of $q$
+
+$$\pi = com_q = q(\alpha) g_1 \in G_1$$
+
+Up until now, the protocol looks like
+1. **P** commits to $f$, sending $c = com_f \in G_1$ to **V**
+2. **V** sends a random $u \in F_p$ to **P**
+3. **P** claims that $f(u) = v \in F_p$, with proof $\pi \in G_1$
+
+Next, how does **V** verify if the proof is valid?
+**V** want to check if this equation holds: $q(X) = \frac{f(X) - v}{X - u}$, or $$q(X) (X - u) = f(X) - v$$.
+As usual, we only need to verify it at a random point, i.e. $\alpha$ that no one knows. Therefore the verification is reduced to whether this holds:
+
+$$q(\alpha) (\alpha - u) = f(\alpha) - v$$, where both sides are $F_p$
+
+Or
+
+$$[q(\alpha) (\alpha - u)] g_1 = [f(\alpha) - v] g_1$$, where both sides are points on $G_1$
+
+But now there is an issue: **V** knows $q(\alpha)g_1 = \pi, f(\alpha)g_1 = c$, even $\alpha g_1$ from public parameter $gp$. But we cannot "multiply" the scalar to get $[q(\alpha) (\alpha - u)] g_1$.
+This is where the pairing comes in.
+
+### verify with pairing
+Pairing curves come with the function $e: G_1 \times G_2 \rightarrow G_T$ with the property
+
+$$e(a \cdot g_1, b \cdot g_2) = ab \cdot e(g_1, g_2)$$
+
+This gives us a way to compute (or at least verify) $ab \cdot g_1$ as 
+
+$$e(ab \cdot g_1, g_2) = ab \cdot e(g_1, g_2) = e(a \cdot g_1, b \cdot g_2)$$
+
+Plug this back to the verification $$[q(\alpha) (\alpha - u)] g_1 = [f(\alpha) - v] g_1$$, we can set $a = q(\alpha), b = \alpha - u$.
+
+$$e(LHS, g_2) = e(ab \cdot g_1, g_2) = e(a \cdot g_1, b \cdot g_2) = e(q(\alpha) g_1, (\alpha-u) g_2)$$
+
+is computable. And the other side is even easier: $e(RHS, g_2) = e((f(\alpha) - v) \cdot g_1, g_2)$
+
+So the final verification is to check whether this holds 
+
+$$e(\pi g_1, (\alpha-u) g_2) = e((c - v) \cdot g_1, g_2)$$
+
+## Efficiency
+
+### batching
+
+
+### Lagrange interpolation
+
+
+## Reference:
+* [ZK MOOC](https://www.youtube.com/watch?v=A0oZVEXav24)
+* [https://dankradfeist.de/ethereum/2020/06/16/kate-polynomial-commitments.html](https://dankradfeist.de/ethereum/2020/06/16/kate-polynomial-commitments.html)
+* [https://crypto.stanford.edu/cs355/24sp/lec12.pdf](https://crypto.stanford.edu/cs355/24sp/lec12.pdf)
