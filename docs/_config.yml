@@ -62,6 +62,8 @@ plugins:
 
 markdown: kramdown
 # kramdown:
+#   math_engine: mathjax
+# kramdown:
 #   input: GFM
 #   math_engine: mathjax
 #   syntax_highlighter: rouge
